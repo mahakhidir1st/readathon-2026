@@ -380,7 +380,14 @@ footer{
 
 <footer>The Great Campus Readathon: 2026 Edition &nbsp;·&nbsp; Cultural &amp; Social Office · AIChE · University of Khartoum</footer>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+const { createClient } = supabase;
+const db = createClient(
+  'https://blcjhlzbuevgxmaeanab.supabase.co',
+  'sb_publishable_CawL7JS4kha9kJsVhqOx-A_ESloKMF_'
+);
+
 const DAYS=['Apr 23','Apr 24','Apr 25','Apr 26','Apr 27','Apr 28','Apr 29'];
 const DEPT_SHORT={
   'Agricultural and Biological Engineering':'AgBio',
@@ -397,8 +404,8 @@ let participants=[];
 let selectedId=null;
 
 async function loadParticipants(){
-  try{const r=await fetch('/api/participants');participants=await r.json()}
-  catch(e){participants=[]}
+  const {data,error}=await db.from('participants').select('*');
+  if(!error) participants=data||[];
 }
 
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
@@ -424,17 +431,17 @@ async function register(){
   const dept=document.getElementById('r-dept').value;
   const books=document.getElementById('r-books').value.trim();
   if(!name||!year||!dept||!books){showMsg('r-msg','error','Please fill in all fields before registering.');return}
-  try{
-    const r=await fetch('/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,year,dept,books})});
-    const data=await r.json();
-    if(!r.ok){showMsg('r-msg','error',data.error);return}
-    showMsg('r-msg','success',"You're registered! Come back each day and log your pages under \"Log Progress\".");
-    document.getElementById('r-name').value='';
-    document.getElementById('r-year').value='';
-    document.getElementById('r-dept').value='';
-    document.getElementById('r-books').value='';
-    await loadParticipants();
-  }catch(e){showMsg('r-msg','error','Could not connect to server. Please try again.')}
+  const {data:existing}=await db.from('participants').select('id').ilike('name',name).eq('dept',dept).maybeSingle();
+  if(existing){showMsg('r-msg','error','This name is already registered for this department.');return}
+  const id=Date.now()+''+Math.random().toString(36).slice(2);
+  const {error}=await db.from('participants').insert({id,name,year,dept,books,pages:[0,0,0,0,0,0,0]});
+  if(error){showMsg('r-msg','error','Registration failed. Please try again.');return}
+  showMsg('r-msg','success',"You're registered! Come back each day and log your pages under \"Log Progress\".");
+  document.getElementById('r-name').value='';
+  document.getElementById('r-year').value='';
+  document.getElementById('r-dept').value='';
+  document.getElementById('r-books').value='';
+  await loadParticipants();
 }
 
 function searchParticipants(){
@@ -472,13 +479,10 @@ function cancelLog(){selectedId=null;document.getElementById('log-card').style.d
 async function saveLog(){
   const p=participants.find(x=>x.id===selectedId);if(!p)return;
   const pages=DAYS.map((_,i)=>Math.max(0,parseInt(document.getElementById('dc-'+i).value)||0));
-  try{
-    const r=await fetch('/api/participants/'+selectedId+'/pages',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({pages})});
-    const data=await r.json();
-    if(!r.ok){showMsg('log-msg','error',data.error);return}
-    p.pages=pages;
-    showMsg('log-msg','success','Progress saved! Check the leaderboard to see your ranking.');
-  }catch(e){showMsg('log-msg','error','Could not connect to server. Please try again.')}
+  const {error}=await db.from('participants').update({pages}).eq('id',selectedId);
+  if(error){showMsg('log-msg','error','Could not save. Please try again.');return}
+  p.pages=pages;
+  showMsg('log-msg','success','Progress saved! Check the leaderboard to see your ranking.');
 }
 
 function totalPages(p){return p.pages.reduce((a,b)=>a+b,0)}
@@ -499,7 +503,7 @@ async function renderLeaderboard(){
     const pg=totalPages(p);
     const pct=maxPg>0?Math.round(pg/maxPg*100):0;
     return`<div class="lb-row">
-      <div class="lb-rank ${i<3?'r'+(i+1):''}"> ${i<3?medals[i]:i+1}</div>
+      <div class="lb-rank ${i<3?'r'+(i+1):''}">${i<3?medals[i]:i+1}</div>
       <div class="lb-body">
         <div class="lb-name">${esc(p.name)}<span class="badge">${DEPT_SHORT[p.dept]||p.dept}</span></div>
         <div class="lb-meta">${esc(p.year)} · ${esc(p.books)}</div>
