@@ -3,7 +3,10 @@ const fs = require('fs');
 const path = require('path');
 
 const app = express();
-const DATA_FILE = path.join(__dirname, 'data', 'participants.json');
+const DATA_DIR = process.env.PROJECT_DOMAIN
+  ? path.join(__dirname, '.data')        // Glitch persistent storage
+  : path.join(__dirname, 'data');        // local dev
+const DATA_FILE = path.join(DATA_DIR, 'participants.json');
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
@@ -49,8 +52,7 @@ app.patch('/api/participants/:id/pages', (req, res) => {
   res.json({ success: true });
 });
 
-const dataDir = path.join(__dirname, 'data');
-if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 if (!fs.existsSync(DATA_FILE)) writeData([]);
 
 app.listen(PORT, () => console.log(`Readathon server running on port ${PORT}`));
