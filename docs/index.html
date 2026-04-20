@@ -331,7 +331,7 @@ footer{
 
   <!-- LOG PROGRESS -->
   <section id="sec-log" class="section">
-    <div class="card">
+    <div class="card" id="search-card">
       <h2 class="card-title">Find Your Registration</h2>
       <div class="field" style="margin-bottom:1rem">
         <input type="text" id="log-search" placeholder="Start typing your name…" oninput="searchParticipants()">
@@ -339,13 +339,13 @@ footer{
       <div id="search-results"></div>
     </div>
     <div class="card" id="log-card" style="display:none">
-      <h2 class="card-title" id="log-card-title">Pages read this week</h2>
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:1.25rem;padding-bottom:.85rem;border-bottom:1px solid var(--border)">
+        <h2 class="card-title" id="log-card-title" style="margin-bottom:0;padding-bottom:0;border-bottom:none">Pages read this week</h2>
+        <button class="btn btn-ghost btn-sm" onclick="forgetUser()">Not you?</button>
+      </div>
       <p style="font-size:13px;color:var(--ink-lt);margin-bottom:1.2rem">Enter the number of pages read each day. Use 0 if you didn't read that day.</p>
       <div class="days-grid" id="days-grid"></div>
-      <div style="display:flex;gap:10px">
-        <button class="btn btn-primary" onclick="saveLog()">Save Progress</button>
-        <button class="btn btn-ghost" onclick="cancelLog()">Cancel</button>
-      </div>
+      <button class="btn btn-primary" onclick="saveLog()">Save Progress</button>
       <div class="msg" id="log-msg"></div>
     </div>
   </section>
@@ -417,12 +417,30 @@ function switchTab(t,idx){
   document.getElementById('sec-'+t).classList.add('active');
   document.querySelectorAll('.nav-tab')[idx].classList.add('active');
   if(t==='leaderboard')renderLeaderboard();
-  if(t==='log'){
+  if(t==='log') loadLogTab();
+}
+
+async function loadLogTab(){
+  await loadParticipants();
+  const saved=localStorage.getItem('readathon_uid');
+  const p=saved&&participants.find(x=>x.id===saved);
+  if(p){
+    document.getElementById('search-card').style.display='none';
+    openLog(p.id);
+  } else {
+    document.getElementById('search-card').style.display='block';
     document.getElementById('log-search').value='';
     document.getElementById('search-results').innerHTML='';
     document.getElementById('log-card').style.display='none';
-    loadParticipants();
   }
+}
+
+function forgetUser(){
+  localStorage.removeItem('readathon_uid');
+  document.getElementById('search-card').style.display='block';
+  document.getElementById('log-card').style.display='none';
+  document.getElementById('log-search').value='';
+  document.getElementById('search-results').innerHTML='';
 }
 
 async function register(){
@@ -462,6 +480,7 @@ function searchParticipants(){
 
 function openLog(id){
   selectedId=id;
+  localStorage.setItem('readathon_uid',id);
   const p=participants.find(x=>x.id===id);if(!p)return;
   document.getElementById('log-card-title').textContent='Logging for: '+p.name;
   document.getElementById('days-grid').innerHTML=DAYS.map((d,i)=>`
